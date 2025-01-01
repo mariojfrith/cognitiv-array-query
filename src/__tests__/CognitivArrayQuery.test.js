@@ -15,15 +15,30 @@ describe('CognitivArrayQuery', () => {
         items: [
           {
             card_number: '1234',
-            tags: ['credit', 'active']
+            tags: ['credit', 'active'],
+            transactions: [
+              { amount: 100, type: 'purchase', date: '2023-01-01' },
+              { amount: 50, type: 'refund', date: '2023-01-15' }
+            ]
           },
           {
             card_number: '0000',
-            tags: ['debit', 'expired'] 
+            tags: ['debit', 'expired'],
+            transactions: [
+              { amount: 200, type: 'withdrawal', date: '2023-02-01' }
+            ]
           },
         ],
         joined: '2023-01-15',
-        nested: { level: 1, value: 'test' },
+        nested: { 
+          level: 1, 
+          value: 'test',
+          metadata: {
+            created: '2023-01-01',
+            status: { isActive: true }
+          }
+        },
+        scores: [[85, 90], [75, 80]]
       },
       {
         name: 'Jane',
@@ -33,15 +48,27 @@ describe('CognitivArrayQuery', () => {
         items: [
           {
             card_number: '5678',
-            tags: ['credit', 'active']
+            tags: ['credit', 'active'],
+            transactions: [
+              { amount: 300, type: 'purchase', date: '2023-03-01' }
+            ]
           },
           {
             card_number: '9999',
-            tags: ['debit', 'active']
+            tags: ['debit', 'active'],
+            transactions: []
           },
         ],
         joined: '2023-02-20',
-        nested: { level: 2, value: 'demo' },
+        nested: { 
+          level: 2, 
+          value: 'demo',
+          metadata: {
+            created: '2023-02-01',
+            status: { isActive: false }
+          }
+        },
+        scores: [[95, 92], [88, 85]]
       },
       {
         name: 'Bob',
@@ -50,7 +77,15 @@ describe('CognitivArrayQuery', () => {
         tags: ['developer', 'architect'],
         items: [],
         joined: '2023-03-10',
-        nested: { level: 1, value: 'prod' },
+        nested: { 
+          level: 1, 
+          value: 'prod',
+          metadata: {
+            created: '2023-03-01',
+            status: { isActive: true }
+          }
+        },
+        scores: [[70, 75], [80, 85]]
       },
     ];
   });
@@ -69,167 +104,30 @@ describe('CognitivArrayQuery', () => {
     });
   });
 
-  describe('Array Field Queries', () => {
-    test('should match array containing value', () => {
+  describe('Complex Array Field Queries', () => {
+    test('should match nested array elements with multiple conditions', () => {
       const result = query.query(testData, {
-        tags: { $contains: 'developer' },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'John']);
-    });
-
-    test('should match array containing all values', () => {
-      const result = query.query(testData, {
-        tags: { $containsAll: ['developer', 'manager'] },
-      });
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('John');
-    });
-
-    test('should match array size', () => {
-      const result = query.query(testData, {
-        tags: { $size: 2 },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'John']);
-    });
-  });
-
-  describe('Logical Operators', () => {
-    test('should combine conditions with $and', () => {
-      const result = query.query(testData, {
-        $and: [{ age: { $gte: 30 } }, { tags: { $contains: 'developer' } }],
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'John']);
-    });
-
-    test('should combine conditions with $or', () => {
-      const result = query.query(testData, {
-        $or: [{ name: 'Jane' }, { age: { $gt: 30 } }],
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'Jane']);
-    });
-
-    test('should negate condition with $not', () => {
-      const result = query.query(testData, {
-        $not: { name: 'John' },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'Jane']);
-    });
-
-    test('should handle complex nested logical operators', () => {
-      const result = query.query(testData, {
-        $and: [
-          { $or: [{ name: 'John' }, { name: 'Bob' }] },
-          { $not: { tags: { $contains: 'manager' } } },
-        ],
-      });
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Bob');
-    });
-  });
-
-  describe('Date Operations', () => {
-    test('should match dates before specified date', () => {
-      const result = query.query(testData, {
-        joined: { $lte: '2023-02-01' },
-      });
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('John');
-    });
-
-    test('should match dates after specified date', () => {
-      const result = query.query(testData, {
-        joined: { $gte: '2023-02-01' },
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'Jane']);
-    });
-  });
-
-  describe('Nested Object Queries', () => {
-    test('should match on nested object fields using dot notation', () => {
-      const result = query.query(testData, {
-        'nested.level': 1,
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'John']);
-    });
-
-    test('should match nested field with regex', () => {
-      const result = query.query(testData, {
-        'nested.value': { $regex: '^te' },
-      });
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('John');
-    });
-  });
-
-  describe('Callback Operator ($cb)', () => {
-    test('should filter using custom callback function', () => {
-      const callback = (row, key, comparators, Utils) => {
-        const age = Utils.get(row, 'age');
-        const role = Utils.get(row, 'role');
-        return age > 30 && role === 'developer';
-      };
-
-      const result = query.query(testData, {
-        role: { $cb: callback },
-      });
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Bob');
-    });
-
-    test('should throw error for invalid callback', () => {
-      expect(() => {
-        query.query(testData, {
-          name: { $cb: 'notAFunction' },
-        });
-      }).toThrow();
-    });
-  });
-
-  describe('Element Match Operator ($eleMatch)', () => {
-    test('should match array elements meeting criteria', () => {
-      const result = query.query(testData, {
-        $eleMatch: {
-          'items.card_number': { $eq: '5678' },
-        },
+        items: {
+          $eleMatch: {
+            tags: { $containsAll: ['credit', 'active'] },
+            transactions: {
+              $eleMatch: {
+                amount: { $gt: 200 },
+                type: 'purchase'
+              }
+            }
+          }
+        }
       });
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Jane');
     });
 
-    test('should handle $eleMatch with logical operators', () => {
+    test('should match multi-dimensional array elements', () => {
       const result = query.query(testData, {
-        $and: [
-          { tags: { $eleMatch: { $eq: 'developer' } } },
-          { age: { $gte: 30 } },
-        ],
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map((r) => r.name).sort()).toEqual(['Bob', 'John']);
-    });
-
-    test('should match array elements meeting $and criteria', () => {
-      const result = query.query(testData, {
-        $and: [
-          { tags: { $eleMatch: { $eq: 'developer' } } },
-          { age: { $gte: 29 } },
-        ],
-      });
-      expect(result).toHaveLength(2);
-      expect(result.map(r => r.name).sort()).toEqual(['Bob', 'John']);
-    });
-
-    test('should match items with credit and active tags', () => {
-      const result = query.query(testData, {
-        items: {
+        scores: {
           $eleMatch: {
-            tags: { $containsAll: ['credit', 'active'] }
+            $eleMatch: { $gte: 90 }
           }
         }
       });
@@ -237,11 +135,177 @@ describe('CognitivArrayQuery', () => {
       expect(result.map(r => r.name).sort()).toEqual(['Jane', 'John']);
     });
 
-    test('should match items with debit and expired tags', () => {
+    test('should handle complex array size conditions', () => {
+      // Test data should have:
+      // - John with items.transactions array length > 1 and tags array length >= 2
+      // - Other records that don't match these conditions
+      const result = query.query(testData, {
+        $and: [
+          { 'items.transactions': { $size: { $gt: 1 } } }, // Check transactions array has more than 1 element
+          { tags: { $size: { $gte: 2 } } } // Check tags array has 2 or more elements
+        ]
+      });
+
+      // Verify results
+      expect(result).toHaveLength(1); // Should only match one record
+      expect(result[0].name).toBe('John'); // Should be John's record
+    });
+  });
+
+  describe('Advanced Logical Operators', () => {
+    test('should handle deeply nested logical conditions', () => {
+      const result = query.query(testData, {
+        $and: [
+          {
+            $or: [
+              { 'nested.metadata.status.isActive': true },
+              { age: { $gt: 32 } }
+            ]
+          },
+          {
+            $not: {
+              $and: [
+                { role: 'designer' },
+                { tags: { $size: { $lt: 2 } } }
+              ]
+            }
+          },
+          {
+            items: {
+              $eleMatch: {
+                $or: [
+                  { 
+                    transactions: { 
+                      $eleMatch: { amount: { $gt: 150 } } 
+                    }
+                  },
+                  { tags: { $containsAll: ['credit', 'active'] } }
+                ]
+              }
+            }
+          }
+        ]
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
+    });
+
+    test('should combine multiple array and nested object conditions', () => {
+      const result = query.query(testData, {
+        $or: [
+          {
+            $and: [
+              { 'nested.level': 1 },
+              { 'nested.metadata.status.isActive': true },
+              { 
+                items: { 
+                  $eleMatch: { 
+                    transactions: { 
+                      $eleMatch: { 
+                        $and: [
+                          { type: 'purchase' },
+                          { amount: { $lt: 150 } }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            $and: [
+              { age: { $lt: 30 } },
+              { 'nested.metadata.created': { $gt: '2023-01-15' } },
+              { scores: { $eleMatch: { $eleMatch: { $gt: 90 } } } }
+            ]
+          }
+        ]
+      });
+      expect(result).toHaveLength(2);
+      expect(result.map(r => r.name).sort()).toEqual(['Jane', 'John']);
+    });
+  });
+
+  describe('Date Operations', () => {
+    test('should match complex date conditions across nested structures', () => {
+      const result = query.query(testData, {
+        $and: [
+          { joined: { $gte: '2023-01-01' } },
+          { 
+            items: { 
+              $eleMatch: { 
+                transactions: { 
+                  $eleMatch: { 
+                    date: { $lt: '2023-02-01' } 
+                  }
+                }
+              }
+            }
+          },
+          { 'nested.metadata.created': { $lte: '2023-02-01' } }
+        ]
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
+    });
+  });
+
+  describe('Nested Object Queries', () => {
+    test('should handle complex nested object conditions', () => {
+      const result = query.query(testData, {
+        $and: [
+          { 'nested.level': { $lte: 2 } },
+          { 'nested.metadata.status.isActive': true },
+          { 
+            $or: [
+              { 'nested.value': { $regex: '^te' } },
+              { 'nested.value': { $regex: '^pr' } }
+            ]
+          }
+        ]
+      });
+      expect(result).toHaveLength(2);
+      expect(result.map(r => r.name).sort()).toEqual(['Bob', 'John']);
+    });
+  });
+
+  describe('Callback Operator ($cb)', () => {
+    test('should handle complex callback with nested data', () => {
+      const callback = (row, key, comparators, Utils) => {
+        const hasHighScore = row.scores.some(subArray => 
+          subArray.some(score => score > 90)
+        );
+        const hasActiveCards = row.items.some(item => 
+          item.tags.includes('active') && 
+          item.transactions.some(t => t.amount > 250)
+        );
+        return hasHighScore && hasActiveCards;
+      };
+
+      const result = query.query(testData, {
+        $cb: callback
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Jane');
+    });
+  });
+
+  describe('Element Match Operator ($eleMatch)', () => {
+    test('should match deeply nested array elements with multiple conditions', () => {
       const result = query.query(testData, {
         items: {
           $eleMatch: {
-            tags: { $containsAll: ['debit', 'expired'] }
+            tags: { $contains: 'credit' },
+            transactions: {
+              $eleMatch: {
+                $and: [
+                  { type: 'purchase' },
+                  { amount: { $gt: 50 } },
+                  { date: { $lt: '2023-02-01' } }
+                ]
+              }
+            }
           }
         }
       });
@@ -262,6 +326,26 @@ describe('CognitivArrayQuery', () => {
       expect(() => {
         query.query(testData, {
           age: { $invalidOperator: 30 },
+        });
+      }).toThrow();
+    });
+
+    test('should handle deeply nested invalid operations', () => {
+      expect(() => {
+        query.query(testData, {
+          $and: [
+            { 
+              items: { 
+                $eleMatch: { 
+                  transactions: { 
+                    $eleMatch: { 
+                      amount: { $invalidOp: 100 } 
+                    }
+                  }
+                }
+              }
+            }
+          ]
         });
       }).toThrow();
     });

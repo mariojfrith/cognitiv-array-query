@@ -64,7 +64,7 @@ class CognitivArrayQuery {
   }
 
   _hasSpecialOperator(condition) {
-    return condition.$eleMatch || condition.$cb;
+    return condition && typeof condition === 'object' && (condition.$eleMatch || condition.$cb);
   }
 
   _evaluateSpecialOperator(row, field, condition, getter) {
@@ -90,6 +90,43 @@ class CognitivArrayQuery {
         return this.logic[key](row, conditions, getter);
       }
 
+      // Handle array size conditions
+      if (condition && typeof condition === 'object') {
+        // Handle dot notation paths
+        if (key.includes('.')) {
+          const parts = key.split('.');
+          let currentValue = row;
+          
+          // Navigate through the path
+          for (let i = 0; i < parts.length - 1; i++) {
+            currentValue = this.Utils.get(currentValue, parts[i]);
+            if (!currentValue) return false;
+            
+            // If we encounter an array in the path, we need to check each element
+            if (Array.isArray(currentValue)) {
+              const remainingPath = parts.slice(i + 1).join('.');
+              const values = currentValue.map(item => this.Utils.get(item, remainingPath)).filter(Array.isArray);
+              
+              if (condition.$size !== undefined) {
+                return values.some(arr => this.comparators.$size(arr, condition.$size));
+              }
+            }
+          }
+          
+          // Get the final value
+          const finalValue = this.Utils.get(currentValue, parts[parts.length - 1]);
+          if (Array.isArray(finalValue) && condition.$size !== undefined) {
+            return this.comparators.$size(finalValue, condition.$size);
+          }
+        } else {
+          // Handle direct field access
+          const value = getter ? getter(row, key) : this.Utils.get(row, key);
+          if (Array.isArray(value) && condition.$size !== undefined) {
+            return this.comparators.$size(value, condition.$size);
+          }
+        }
+      }
+
       // Handle regular conditions
       return this._evaluateCondition(row, key, condition, getter);
     });
@@ -105,6 +142,57 @@ class CognitivArrayQuery {
     // Handle special operators
     if (this._hasSpecialOperator(condition)) {
       return this._evaluateSpecialOperator(row, field, condition, getter);
+    }
+
+    // Handle array size conditions
+    if (condition.$size !== undefined) {
+      const value = getter ? getter(row, field) : this.Utils.get(row, field);
+      if (Array.isArray(value)) {
+        return this.comparators.$size(value, condition.$size);
+      }
+      return false;
+    }
+
+    // Handle nested size conditions
+    if (field.includes('.')) {
+      const parts = field.split('.');
+      let currentValue = row;
+      
+      // Navigate through the path
+      for (let i = 0; i < parts.length - 1; i++) {
+        currentValue = this.Utils.get(currentValue, parts[i]);
+        if (!currentValue) return false;
+        
+        // If we encounter an array in the path, we need to check each element
+        if (Array.isArray(currentValue)) {
+          const remainingPath = parts.slice(i + 1).join('.');
+          const values = currentValue.map(item => this.Utils.get(item, remainingPath)).filter(Array.isArray);
+          
+          if (condition.$size !== undefined) {
+            return values.some(arr => this.comparators.$size(arr, condition.$size));
+          }
+        }
+      }
+      
+      // Get the final value
+      const finalValue = this.Utils.get(currentValue, parts[parts.length - 1]);
+      if (Array.isArray(finalValue)) {
+        if (condition.$size !== undefined) {
+          return this.comparators.$size(finalValue, condition.$size);
+        }
+        
+        if (typeof condition === 'object') {
+          return Object.entries(condition).every(([k, v]) => {
+            if (k.includes('.')) {
+              const nestedValues = finalValue.map(item => this.Utils.get(item, k)).filter(Array.isArray);
+              if (v && typeof v === 'object' && v.$size !== undefined) {
+                return nestedValues.some(arr => this.comparators.$size(arr, v.$size));
+              }
+            }
+            return this._evaluateCondition(finalValue, k, v, getter);
+          });
+        }
+      }
     }
 
     // Handle regular operators
