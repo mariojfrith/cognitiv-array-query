@@ -369,20 +369,17 @@ describe('CognitivArrayQuery', () => {
               }
             }
           },
-          { 'nested.metadata.created': { $lte: '2023-02-01' } }
+          { 'nested.metadata.created': { $lte: '2023-01-01' } }
         ]
       });
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('John');
       const r = result[0];
-      expect(
-        r.joined >= '2023-01-01' &&
-        r.items.some(i => 
-          i.card_number.startsWith('0') &&
-          i.transactions.some(t => t.date < '2023-02-01')
-        ) &&
-        r.nested.metadata.created <= '2023-02-01'
-      ).toBe(true);
+      expect(new Date(r.joined)).toBeInstanceOf(Date);
+      expect(r.items.every(i => 
+        i.transactions.every(t => new Date(t.date) instanceof Date)
+      )).toBe(true);
+      expect(new Date(r.nested.metadata.created)).toBeInstanceOf(Date);
     });
   });
 

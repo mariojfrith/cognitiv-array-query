@@ -169,6 +169,7 @@ class CognitivArrayQuery {
 
     return Object.entries(condition).every(([key, val]) => {
       if (key.startsWith('$')) {
+
         const comparator = this.comparators[key];
         if (!comparator) throw new Error(`Unsupported operator: ${key}`);
         return comparator(value, val);

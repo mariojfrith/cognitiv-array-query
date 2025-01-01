@@ -16,21 +16,41 @@ class Comparators {
     }
     return a === b;
   };
-  $ne = (a, b) => !this.$eq(a, b);
+
+  $ne = (a, b) => {
+    if (this.dateUtils.isDateLike(a) && this.dateUtils.isDateLike(b)) {
+      return this.dateUtils.compare(a, b) !== 0;
+    }
+    return a !== b;
+  };
+
   $gt = (a, b) => {
     if (this.dateUtils.isDateLike(a) && this.dateUtils.isDateLike(b)) {
       return this.dateUtils.compare(a, b) > 0;
     }
     return a > b;
   };
-  $gte = (a, b) => this.$gt(a, b) || this.$eq(a, b);
+
+  $gte = (a, b) => {
+    if (this.dateUtils.isDateLike(a) && this.dateUtils.isDateLike(b)) {
+      return this.dateUtils.compare(a, b) >= 0;
+    }
+    return a >= b;
+  };
+
   $lt = (a, b) => {
     if (this.dateUtils.isDateLike(a) && this.dateUtils.isDateLike(b)) {
       return this.dateUtils.compare(a, b) < 0;
     }
     return a < b;
   };
-  $lte = (a, b) => this.$lt(a, b) || this.$eq(a, b);
+
+  $lte = (a, b) => {
+    if (this.dateUtils.isDateLike(a) && this.dateUtils.isDateLike(b)) {
+      return this.dateUtils.compare(a, b) <= 0;
+    }
+    return a <= b;
+  };
 
   // Array operations
   $in = (a, b) => Array.isArray(b) && b.includes(a);
@@ -149,6 +169,9 @@ class Comparators {
 
     // Handle regular operator
     const value = getter ? getter(row, field) : PathUtils.get(row, field);
+    if (this.dateUtils.isDateLike(value) && ['$gt', '$gte', '$lt', '$lte', '$eq', '$ne'].includes(operator)) {
+      return this[operator](value, operand);
+    }
     return this[operator](value, operand, field, getter);
   }
 

@@ -8,7 +8,7 @@ class ElementMatchOperator {
 
   evaluate(row, condition, field, getter) {
     const array = this._getArrayToEvaluate(row, field, getter);
-    
+
     if (!Array.isArray(array)) {
       return this._handleNonArrayInput(array, condition, getter);
     }
@@ -56,7 +56,7 @@ class ElementMatchOperator {
     }
 
     return array.some(element => {
-      return Object.entries(condition).every(([key, value]) => {
+    return Object.entries(condition).every(([key, value]) => {
         if (key.includes('.')) {
           const fieldValue = PathUtils.get(element, key);
           if (value && typeof value === 'object') {
