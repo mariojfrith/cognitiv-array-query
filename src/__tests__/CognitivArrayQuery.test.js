@@ -108,6 +108,12 @@ describe('CognitivArrayQuery', () => {
       expect(result).toHaveLength(2);
       expect(result.map(r => r.name).sort()).toEqual(['Bob', 'John']);
     });
+
+    test('should match nested card number', () => {
+      const result = query.query(testData, { $and: [{ 'items.card_number': { $eq: '5678' } }, { 'items.tags': { $contains: 'credit' } }] });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Jane');
+    });
   });
 
   describe('Basic Field Queries', () => {
@@ -129,6 +135,7 @@ describe('CognitivArrayQuery', () => {
       const result = query.query(testData, {
         items: {
           $eleMatch: {
+            card_number: '5678',
             tags: { $containsAll: ['credit', 'active'] },
             transactions: {
               $eleMatch: {
@@ -195,6 +202,7 @@ describe('CognitivArrayQuery', () => {
               $eleMatch: {
                 $or: [
                   { 
+                    card_number: { $regex: '^12' },
                     transactions: { 
                       $eleMatch: { amount: { $gt: 150 } } 
                     }
@@ -220,6 +228,7 @@ describe('CognitivArrayQuery', () => {
               { 
                 items: { 
                   $eleMatch: { 
+                    card_number: '1234',
                     transactions: { 
                       $eleMatch: { 
                         $and: [
@@ -255,6 +264,7 @@ describe('CognitivArrayQuery', () => {
           { 
             items: { 
               $eleMatch: { 
+                card_number: { $regex: '^0' },
                 transactions: { 
                   $eleMatch: { 
                     date: { $lt: '2023-02-01' } 
@@ -297,6 +307,7 @@ describe('CognitivArrayQuery', () => {
           subArray.some(score => score > 90)
         );
         const hasActiveCards = row.items.some(item => 
+          item.card_number.startsWith('56') && 
           item.tags.includes('active') && 
           item.transactions.some(t => t.amount > 250)
         );
@@ -316,6 +327,7 @@ describe('CognitivArrayQuery', () => {
       const result = query.query(testData, {
         items: {
           $eleMatch: {
+            card_number: '1234',
             tags: { $contains: 'credit' },
             transactions: {
               $eleMatch: {
@@ -357,6 +369,7 @@ describe('CognitivArrayQuery', () => {
             { 
               items: { 
                 $eleMatch: { 
+                  card_number: '1234',
                   transactions: { 
                     $eleMatch: { 
                       amount: { $invalidOp: 100 } 
