@@ -27,7 +27,7 @@ describe('CognitivArrayQuery', () => {
             transactions: [
               { amount: 200, type: 'withdrawal', date: '2023-02-01' }
             ]
-          },
+          }
         ],
         joined: '2023-01-15',
         nested: { 
@@ -111,6 +111,12 @@ describe('CognitivArrayQuery', () => {
 
     test('should match nested card number', () => {
       const result = query.query(testData, { $and: [{ 'items.card_number': { $eq: '5678' } }, { 'items.tags': { $contains: 'credit' } }] });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Jane');
+    });
+
+    test('should match nested card number with array', () => {
+      const result = query.query(testData, { $and: [{ 'items.card_number': { $in: ['5678'] } }, { 'items.tags': { $contains: 'credit' } }] });
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Jane');
     });
