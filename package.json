@@ -9,7 +9,7 @@
     "compile": "babel index.js -o index.compiled.js",
     "minify": "uglifyjs index.compiled.js -o index.min.js",
     "build": "webpack --config webpack.config.js",
-    "all": "npm run test && npm run build && npm run test"
+    "all": "npm run build && npm run test"
   },
   "directories": {
     "test": "**/__tests__"

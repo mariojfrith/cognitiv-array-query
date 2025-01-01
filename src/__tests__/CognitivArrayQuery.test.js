@@ -1,4 +1,4 @@
-const CognitivArrayQuery = require('../CognitivArrayQuery');
+const CognitivArrayQuery = require('../../dist/CognitivArrayQuery.min');
 
 describe('CognitivArrayQuery', () => {
   let query;
@@ -147,6 +147,25 @@ describe('CognitivArrayQuery', () => {
       ))).toBe(true);
     });
 
+    test('should match nested payments and transactions array with $in', () => {
+      const result = query.query(testData, {$or: [
+        { $and: [
+          {'items.transactions.ext_id': { $in: ['1'] }},
+          { 'items.payments.amount': { $in: [100] } }
+          ]},
+        { $and: [
+          { 'items.transactions.ext_id': { $in: ['2'] }},
+          { 'items.payments.amount': { $in: [200] } }
+          ]}
+      ]});
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
+      expect(result[0].items.some(i => i.payments?.some(p => 
+        [100, 200].includes(p.amount)
+      ))).toBe(true);
+    });
+
+
     test('should match nested transactions array with ids', () => {
       const result = query.query(testData, {
         $and: [
@@ -174,11 +193,14 @@ describe('CognitivArrayQuery', () => {
     });
 
     test('should match nested transactions array with dot notation', () => {
-      const result = query.query(testData, {
-        $and: [
+      const result = query.query(testData, {$or: [
+        { $and: [
           { 'items.transactions.ext_id': { $in: ['1'] } }
-        ]
-      });
+        ]},
+        { $and: [
+          { 'items.transactions.ext_id': { $in: ['2'] } }
+        ]}
+      ]});
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('John');
       expect(result[0].items.some(i => i.transactions.some(t => t.ext_id === '1'))).toBe(true);
