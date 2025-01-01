@@ -90,6 +90,26 @@ describe('CognitivArrayQuery', () => {
     ];
   });
 
+  describe('Simple Queries', () => {
+    test('should match simple string equality', () => {
+      const result = query.query(testData, { role: 'designer' });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Jane');
+    });
+
+    test('should match simple numeric equality', () => {
+      const result = query.query(testData, { age: 35 });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Bob');
+    });
+
+    test('should match simple array contains', () => {
+      const result = query.query(testData, { tags: { $contains: 'developer' } });
+      expect(result).toHaveLength(2);
+      expect(result.map(r => r.name).sort()).toEqual(['Bob', 'John']);
+    });
+  });
+
   describe('Basic Field Queries', () => {
     test('should match exact string value', () => {
       const result = query.query(testData, { name: 'John' });
