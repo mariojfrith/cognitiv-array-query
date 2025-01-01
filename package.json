@@ -4,8 +4,8 @@
   "descrption": "A Javascript class to execute MongoDb-like queries on arrays.",
   "main": "index.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test": "node --no-deprecation --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --no-deprecation --experimental-vm-modules node_modules/jest/bin/jest.js --watch", 
     "compile": "babel index.js -o index.compiled.js",
     "minify": "uglifyjs index.compiled.js -o index.min.js",
     "build": "webpack --config webpack.config.js",
