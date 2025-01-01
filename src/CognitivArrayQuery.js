@@ -77,6 +77,110 @@ class CognitivArrayQuery {
     return false;
   }
 
+  _evaluateArrayPath(value, path, condition) {
+    if (!Array.isArray(value)) return false;
+
+    if (condition.$eleMatch) {
+      return value.some(item => {
+        if (path.includes('.')) {
+          const [first, ...rest] = path.split('.');
+          const nextValue = this.Utils.get(item, first);
+          if (Array.isArray(nextValue)) {
+            return nextValue.some(element => {
+              return Object.entries(condition.$eleMatch).every(([key, val]) => {
+                const fieldValue = this.Utils.get(element, key);
+                if (typeof val === 'object' && val !== null) {
+                  if (val.$in && Array.isArray(fieldValue)) {
+                    return fieldValue.some(v => val.$in.includes(v));
+                  }
+                  return this._evaluateElement(fieldValue, val);
+                }
+                return this.comparators.$eq(fieldValue, val);
+              });
+            });
+          }
+          const targetValue = this.Utils.get(item, path);
+          if (Array.isArray(targetValue)) {
+            return targetValue.some(element => {
+              return Object.entries(condition.$eleMatch).every(([key, val]) => {
+                const fieldValue = this.Utils.get(element, key);
+                if (typeof val === 'object' && val !== null) {
+                  if (val.$in && Array.isArray(fieldValue)) {
+                    return fieldValue.some(v => val.$in.includes(v));
+                  }
+                  return this._evaluateElement(fieldValue, val);
+                }
+                return this.comparators.$eq(fieldValue, val);
+              });
+            });
+          }
+        }
+        const fieldValue = this.Utils.get(item, path);
+        if (Array.isArray(fieldValue)) {
+          return fieldValue.some(element => {
+            return Object.entries(condition.$eleMatch).every(([key, val]) => {
+              const elemValue = this.Utils.get(element, key);
+              if (typeof val === 'object' && val !== null) {
+                if (val.$in && Array.isArray(elemValue)) {
+                  return elemValue.some(v => val.$in.includes(v));
+                }
+                return this._evaluateElement(elemValue, val);
+              }
+              return this.comparators.$eq(elemValue, val);
+            });
+          });
+        }
+        return this._evaluateElement(fieldValue, condition.$eleMatch);
+      });
+    }
+
+    return value.some(item => {
+      if (path.includes('.')) {
+        const [first, ...rest] = path.split('.');
+        const nextValue = this.Utils.get(item, first);
+        if (Array.isArray(nextValue)) {
+          return this._evaluateArrayPath(nextValue, rest.join('.'), condition);
+        }
+        return this._evaluateCondition(item, path, condition);
+      }
+
+      const fieldValue = this.Utils.get(item, path);
+      if (Array.isArray(fieldValue)) {
+        if (condition.$in) {
+          return fieldValue.some(val => condition.$in.includes(val));
+        }
+        if (condition.$contains) {
+          return this.comparators.$contains(fieldValue, condition.$contains);
+        }
+        if (condition.$size) {
+          return this.comparators.$size(fieldValue, condition.$size);
+        }
+        return fieldValue.some(val => this._evaluateCondition({ value: val }, 'value', condition));
+      }
+
+      return this._evaluateElement(fieldValue, condition);
+    });
+  }
+
+  _evaluateElement(value, condition) {
+    if (!condition || typeof condition !== 'object') {
+      return this.comparators.$eq(value, condition);
+    }
+
+    return Object.entries(condition).every(([key, val]) => {
+      if (key.startsWith('$')) {
+        const comparator = this.comparators[key];
+        if (!comparator) throw new Error(`Unsupported operator: ${key}`);
+        return comparator(value, val);
+      }
+      const fieldValue = this.Utils.get(value, key);
+      if (typeof val === 'object' && val !== null) {
+        return this._evaluateElement(fieldValue, val);
+      }
+      return this.comparators.$eq(fieldValue, val);
+    });
+  }
+
   _processObject(row, constraints, getter) {
     // Group dot notation paths by their root
     const dotPaths = {};
@@ -99,32 +203,10 @@ class CognitivArrayQuery {
       const rootValue = getter ? getter(row, root) : this.Utils.get(row, root);
       
       if (Array.isArray(rootValue)) {
-        // All conditions under the same root must match for at least one array element
-        const matches = rootValue.some(element => {
-          return Object.entries(conditions).every(([path, condition]) => {
-            const relativePath = path.substring(root.length + 1);
-            const value = this.Utils.get(element, relativePath);
-            
-            if (condition && typeof condition === 'object') {
-              if (condition.$size !== undefined && Array.isArray(value)) {
-                return this.comparators.$size(value, condition.$size);
-              }
-              if (condition.$contains && Array.isArray(value)) {
-                return this.comparators.$contains(value, condition.$contains);
-              }
-              // Handle other operators
-              return Object.entries(condition).every(([op, val]) => {
-                if (op.startsWith('$')) {
-                  const comparator = this.comparators[op];
-                  if (!comparator) throw new Error(`Unsupported operator: ${op}`);
-                  return comparator(value, val);
-                }
-                return this._evaluateCondition(element, relativePath, condition, getter);
-              });
-            }
-            
-            return this.comparators.$eq(value, condition);
-          });
+        // Handle array paths
+        const matches = Object.entries(conditions).every(([path, condition]) => {
+          const relativePath = path.substring(root.length + 1);
+          return this._evaluateArrayPath(rootValue, relativePath, condition);
         });
         
         if (!matches) return false;
@@ -132,19 +214,7 @@ class CognitivArrayQuery {
         // Handle non-array nested objects
         const matches = Object.entries(conditions).every(([path, condition]) => {
           const value = this.Utils.get(row, path);
-          
-          if (condition && typeof condition === 'object') {
-            return Object.entries(condition).every(([op, val]) => {
-              if (op.startsWith('$')) {
-                const comparator = this.comparators[op];
-                if (!comparator) throw new Error(`Unsupported operator: ${op}`);
-                return comparator(value, val);
-              }
-              return this._evaluateCondition(row, path, condition, getter);
-            });
-          }
-          
-          return this.comparators.$eq(value, condition);
+          return this._evaluateElement(value, condition);
         });
         
         if (!matches) return false;
@@ -164,16 +234,9 @@ class CognitivArrayQuery {
         return this.logic[key](row, conditions, getter);
       }
 
-      // Handle array size conditions
-      if (condition && typeof condition === 'object') {
-        const value = getter ? getter(row, key) : this.Utils.get(row, key);
-        if (Array.isArray(value) && condition.$size !== undefined) {
-          return this.comparators.$size(value, condition.$size);
-        }
-      }
-
-      // Handle regular conditions
-      return this._evaluateCondition(row, key, condition, getter);
+      // Get the value
+      const value = getter ? getter(row, key) : this.Utils.get(row, key);
+      return this._evaluateElement(value, condition);
     });
   }
 
@@ -211,13 +274,7 @@ class CognitivArrayQuery {
         // If we encounter an array in the path, we need to check each element
         if (Array.isArray(currentValue)) {
           const remainingPath = parts.slice(i + 1).join('.');
-          return currentValue.some(item => {
-            const value = this.Utils.get(item, remainingPath);
-            if (condition.$size !== undefined && Array.isArray(value)) {
-              return this.comparators.$size(value, condition.$size);
-            }
-            return this._evaluateCondition(item, remainingPath, condition, getter);
-          });
+          return this._evaluateArrayPath(currentValue, remainingPath, condition);
         }
       }
       
@@ -226,6 +283,14 @@ class CognitivArrayQuery {
       
       // Handle operators
       if (condition && typeof condition === 'object') {
+        if (Array.isArray(finalValue)) {
+          if (condition.$contains) {
+            return this.comparators.$contains(finalValue, condition.$contains);
+          }
+          if (condition.$in) {
+            return this.comparators.$in(finalValue, condition.$in);
+          }
+        }
         return Object.entries(condition).every(([op, val]) => {
           if (op.startsWith('$')) {
             const comparator = this.comparators[op];

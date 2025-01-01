@@ -10,15 +10,15 @@ describe('CognitivArrayQuery', () => {
       {
         name: 'John',
         age: 30,
-        role: 'developer',
+        role: 'developer', 
         tags: ['developer', 'manager'],
         items: [
           {
             card_number: '1234',
             tags: ['credit', 'active'],
             transactions: [
-              { amount: 100, type: 'purchase', date: '2023-01-01' },
-              { amount: 50, type: 'refund', date: '2023-01-15' }
+              { amount: 100, ids: ['1', '2'], type: 'purchase', date: '2023-01-01' },
+              { amount: 50, ids: ['3'], type: 'refund', date: '2023-01-15' }
             ]
           },
           {
@@ -26,12 +26,16 @@ describe('CognitivArrayQuery', () => {
             tags: ['debit', 'expired'],
             transactions: [
               { amount: 200, type: 'withdrawal', date: '2023-02-01' }
+            ],
+            payments: [
+              { amount: 100, type: 'purchase', date: '2023-01-01' },
+              { amount: 100, type: 'purchase', date: '2023-01-01' }
             ]
           }
         ],
         joined: '2023-01-15',
-        nested: { 
-          level: 1, 
+        nested: {
+          level: 1,
           value: 'test',
           metadata: {
             created: '2023-01-01',
@@ -41,7 +45,7 @@ describe('CognitivArrayQuery', () => {
         scores: [[85, 90], [75, 80]]
       },
       {
-        name: 'Jane',
+        name: 'Jane', 
         age: 25,
         role: 'designer',
         tags: ['designer'],
@@ -57,12 +61,12 @@ describe('CognitivArrayQuery', () => {
             card_number: '9999',
             tags: ['debit', 'active'],
             transactions: []
-          },
+          }
         ],
         joined: '2023-02-20',
-        nested: { 
-          level: 2, 
-          value: 'demo',
+        nested: {
+          level: 2,
+          value: 'demo', 
           metadata: {
             created: '2023-02-01',
             status: { isActive: false }
@@ -77,16 +81,16 @@ describe('CognitivArrayQuery', () => {
         tags: ['developer', 'architect'],
         items: [],
         joined: '2023-03-10',
-        nested: { 
-          level: 1, 
+        nested: {
+          level: 1,
           value: 'prod',
           metadata: {
-            created: '2023-03-01',
+            created: '2023-03-01', 
             status: { isActive: true }
           }
         },
         scores: [[70, 75], [80, 85]]
-      },
+      }
     ];
   });
 
@@ -116,10 +120,49 @@ describe('CognitivArrayQuery', () => {
     });
 
     test('should match nested card number with array', () => {
-      const result = query.query(testData, { $and: [{ 'items.card_number': { $in: ['5678'] } }, { 'items.tags': { $contains: 'credit' } }] });
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('Jane');
+      const result = query.query(testData, { $or: [{ $and: [{ 'items.card_number': { $in: ['5678'] } }, { 'items.tags': { $contains: 'credit' } }] }, { $and: [{ 'items.card_number': { $in: ['1234'] } }, { 'items.tags': { $contains: 'credit' } }] }] });
+      expect(result).toHaveLength(2);
+      expect(result.map(r => r.name).sort()).toEqual(['Jane', 'John']);
     });
+
+    test('should match nested payments array', () => {
+      const result = query.query(testData, {
+        'items.payments': {
+          $eleMatch: {
+            amount: 100,
+            type: 'purchase',
+            date: '2023-01-01'
+          }
+        }
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
+    });
+
+    test('should match nested payments array with ids', () => {
+      const result = query.query(testData, {
+        $and: [
+          { 'items.transactions': {
+            $eleMatch: {
+              ids: { $in: ['1'] }
+            }
+          }}
+        ]
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
+    });
+
+    test('should match nested payments array with dot notation', () => {
+      const result = query.query(testData, {
+        $and: [
+          { 'items.transactions.ids': { $in: ['1'] } }
+        ]
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
+    });
+
   });
 
   describe('Basic Field Queries', () => {
@@ -169,19 +212,14 @@ describe('CognitivArrayQuery', () => {
     });
 
     test('should handle complex array size conditions', () => {
-      // Test data should have:
-      // - John with items.transactions array length > 1 and tags array length >= 2
-      // - Other records that don't match these conditions
       const result = query.query(testData, {
         $and: [
-          { 'items.transactions': { $size: { $gt: 1 } } }, // Check transactions array has more than 1 element
-          { tags: { $size: { $gte: 2 } } } // Check tags array has 2 or more elements
+          { 'items.transactions': { $size: { $gt: 1 } } },
+          { tags: { $size: { $gte: 2 } } }
         ]
       });
-
-      // Verify results
-      expect(result).toHaveLength(1); // Should only match one record
-      expect(result[0].name).toBe('John'); // Should be John's record
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
     });
   });
 
