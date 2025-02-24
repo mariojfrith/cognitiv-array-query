@@ -1,9 +1,10 @@
 # Cognitiv Array Query
 
-A powerful JavaScript library for performing complex queries on arrays of objects with support for nested structures, arrays, and advanced operators.
+A powerful JavaScript library for performing MongoDB-style queries on arrays of objects, with enhanced features for offline data filtering. Perfect for working with MongoDB collections locally while maintaining familiar query syntax.
 
 ## Features
 
+- MongoDB-compatible query syntax with additional enhancements
 - Complex nested object and array querying
 - Rich set of comparison operators
 - Support for logical operators ($and, $or, $not)
@@ -13,6 +14,7 @@ A powerful JavaScript library for performing complex queries on arrays of object
 - Custom callback queries
 - Deep object traversal with dot notation
 - Robust error handling
+- Ideal for offline MongoDB collection filtering
 
 ## Installation
 
