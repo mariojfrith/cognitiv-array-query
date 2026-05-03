@@ -1,10 +1,11 @@
 class ArrayUtils {
   static flatten(arr) {
+    if (!Array.isArray(arr)) return [arr];
     return arr.reduce((flat, item) => 
       flat.concat(Array.isArray(item) ? ArrayUtils.flatten(item) : item), []);
   }
 
-  static flatten(obj, useBracketsForArrays = false) {
+  static flattenToDotNotation(obj, useBracketsForArrays = true) {
     /**
      * Internal function to flatten the object.
      * 
@@ -15,21 +16,23 @@ class ArrayUtils {
      * @returns {Object} - A flattened object with keys in dot notation.
      */
     function _flattenObject(obj, parentKey = '', result = {}, useBracketsForArrays = true) {
+      if (obj === null || typeof obj !== 'object') {
+        if (parentKey) result[parentKey] = obj;
+        return result;
+      }
+
       for (let key in obj) {
-        if (obj.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
           const newKey = parentKey ? `${parentKey}.${key}` : key;
           
           if (Array.isArray(obj[key])) {
-            // Handle arrays: iterate over elements and include indices in keys
             obj[key].forEach((item, index) => {
               const arrayKey = useBracketsForArrays ? `${newKey}[${index}]` : `${newKey}.${index}`;
               _flattenObject(item, arrayKey, result, useBracketsForArrays);
             });
           } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-            // Recursively flatten the object if it's not an array
             _flattenObject(obj[key], newKey, result, useBracketsForArrays);
           } else {
-            // Assign the value to the result object with dot notation key
             result[newKey] = obj[key];
           }
         }

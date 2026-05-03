@@ -136,10 +136,11 @@ class ElementMatchOperator {
       const subValue = subFields.length ? PathUtils.get(element, subFields.join('.')) : element;
       const subCondition = condition[dotNotationKey];
 
-      if (this._isEleMatchCondition(subCondition)) {
+      if (this._isElemMatchCondition(subCondition)) {
+        const elemMatchCond = subCondition.$elemMatch || subCondition.$eleMatch;
         return Array.isArray(subValue) ? 
-          subValue.some(item => this._evaluateElement(item, subCondition.$eleMatch)) :
-          this._evaluateElement(subValue, subCondition.$eleMatch);
+          subValue.some(item => this._evaluateElement(item, elemMatchCond)) :
+          this._evaluateElement(subValue, elemMatchCond);
       }
 
       return this._evaluateElement(
@@ -167,8 +168,9 @@ class ElementMatchOperator {
 
       const value = PathUtils.get(element, dotNotationKey);
       if (Array.isArray(value)) {
-        if (this._isEleMatchCondition(subCondition)) {
-          return value.some(v => this._evaluateElement(v, subCondition.$eleMatch));
+        if (this._isElemMatchCondition(subCondition)) {
+          const elemMatchCond = subCondition.$elemMatch || subCondition.$eleMatch;
+          return value.some(v => this._evaluateElement(v, elemMatchCond));
         }
         if (subCondition && typeof subCondition === 'object' && subCondition.$size) {
           return this.comparators.$size(value, subCondition.$size);
@@ -183,10 +185,11 @@ class ElementMatchOperator {
   }
 
   _handleNestedArrayField(array, path, condition) {
-    if (this._isEleMatchCondition(condition)) {
+    if (this._isElemMatchCondition(condition)) {
+      const elemMatchCond = condition.$elemMatch || condition.$eleMatch;
       return array.some(item => {
         const itemValue = path ? PathUtils.get(item, path) : item;
-        return this._evaluateElement(itemValue, condition.$eleMatch);
+        return this._evaluateElement(itemValue, elemMatchCond);
       });
     }
 
@@ -205,11 +208,12 @@ class ElementMatchOperator {
 
   _handleArrayOperations(array, condition, getter) {
     for (const [key, value] of Object.entries(condition)) {
-      if (this._isEleMatchCondition(value)) {
+      if (this._isElemMatchCondition(value)) {
+        const elemMatchCond = value.$elemMatch || value.$eleMatch;
         return array.some(element => {
           const elementArray = PathUtils.get(element, key);
           if (!Array.isArray(elementArray)) return false;
-          return elementArray.some(item => this._evaluateElement(item, value.$eleMatch));
+          return elementArray.some(item => this._evaluateElement(item, elemMatchCond));
         });
       }
     }
@@ -277,8 +281,8 @@ class ElementMatchOperator {
     return array.some(element => this._evaluateElement(element, condition));
   }
 
-  _isEleMatchCondition(value) {
-    return value && typeof value === 'object' && value.$eleMatch;
+  _isElemMatchCondition(value) {
+    return value && typeof value === 'object' && (value.$elemMatch || value.$eleMatch);
   }
 
   _evaluateElement(element, condition) {
@@ -298,8 +302,9 @@ class ElementMatchOperator {
 
       if (Array.isArray(fieldValue)) {
         if (typeof value === 'object' && value !== null) {
-          if (value.$eleMatch) {
-            return fieldValue.some(item => this._evaluateElement(item, value.$eleMatch));
+          if (this._isElemMatchCondition(value)) {
+            const elemMatchCond = value.$elemMatch || value.$eleMatch;
+            return fieldValue.some(item => this._evaluateElement(item, elemMatchCond));
           }
           if (value.$containsAll) {
             return this.comparators.$containsAll(fieldValue, value.$containsAll);
@@ -326,9 +331,10 @@ class ElementMatchOperator {
       }
 
       if (typeof value === 'object' && value !== null) {
-        if (value.$eleMatch) {
+        if (this._isElemMatchCondition(value)) {
+          const elemMatchCond = value.$elemMatch || value.$eleMatch;
           const arrayValue = Array.isArray(fieldValue) ? fieldValue : [fieldValue].filter(Boolean);
-          return arrayValue.some(item => this._evaluateElement(item, value.$eleMatch));
+          return arrayValue.some(item => this._evaluateElement(item, elemMatchCond));
         }
         return Object.entries(value).every(([op, val]) => {
           if (op.startsWith('$')) {

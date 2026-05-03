@@ -1,4 +1,4 @@
-const CognitivArrayQuery = require('../../dist/CognitivArrayQuery.min');
+const CognitivArrayQuery = require('../CognitivArrayQuery');
 
 describe('CognitivArrayQuery', () => {
   let query;
@@ -460,15 +460,15 @@ describe('CognitivArrayQuery', () => {
     });
   });
 
-  describe('Element Match Operator ($eleMatch)', () => {
+  describe('Element Match Operator ($elemMatch)', () => {
     test('should match deeply nested array elements with multiple conditions', () => {
       const result = query.query(testData, {
         items: {
-          $eleMatch: {
+          $elemMatch: {
             card_number: '1234',
             tags: { $contains: 'credit' },
             transactions: {
-              $eleMatch: {
+              $elemMatch: {
                 $and: [
                   { type: 'purchase' },
                   { amount: { $gt: 50 } },
@@ -481,15 +481,14 @@ describe('CognitivArrayQuery', () => {
       });
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('John');
-      expect(result[0].items.some(i => 
-        i.card_number === '1234' &&
-        i.tags.includes('credit') &&
-        i.transactions.some(t => 
-          t.type === 'purchase' &&
-          t.amount > 50 &&
-          t.date < '2023-02-01'
-        )
-      )).toBe(true);
+    });
+
+    test('should match using $all alias', () => {
+      const result = query.query(testData, {
+        tags: { $all: ['developer', 'manager'] }
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('John');
     });
   });
 

@@ -53,13 +53,20 @@ class Comparators {
   };
 
   // Array operations
-  $in = (a, b) => Array.isArray(b) && b.includes(a);
+  $in = (a, b) => {
+    if (!Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+      return a.some(item => b.includes(item));
+    }
+    return b.includes(a);
+  };
   $nin = (a, b) => !this.$in(a, b);
   $contains = (a, b) => Array.isArray(a) && a.includes(b);
   $containsAll = (a, b) =>
     Array.isArray(a) && Array.isArray(b) && b.every((item) => a.includes(item));
   $containsAny = (a, b) =>
     Array.isArray(a) && Array.isArray(b) && b.some((item) => a.includes(item));
+  $all = (a, b) => this.$containsAll(a, b);
   $size = (a, condition) => {
     if (!Array.isArray(a)) return false;
     const size = a.length;
@@ -72,14 +79,22 @@ class Comparators {
   };
 
   // Element Match operation
-  $eleMatch = (row, condition, field, getter) => this.elementMatch.evaluate(row, condition, field, getter);
+  $elemMatch = (row, condition, field, getter) => this.elementMatch.evaluate(row, condition, field, getter);
+  $eleMatch = (row, condition, field, getter) => this.$elemMatch(row, condition, field, getter);
 
   // Type checks
   $type = (a, b) => typeof a === b;
   $exists = (a, b) => (a !== undefined) === b;
   $regex = (a, b) => {
     try {
-      return new RegExp(b).test(String(a));
+      const regex = (typeof b === 'object' && b.$regex) ? 
+        new RegExp(b.$regex, b.$options || '') : 
+        new RegExp(b);
+      
+      if (Array.isArray(a)) {
+        return a.some(item => regex.test(String(item)));
+      }
+      return regex.test(String(a));
     } catch {
       return false;
     }
@@ -137,10 +152,13 @@ class Comparators {
   };
 
   _hasSpecialOperator(condition) {
-    return condition.$eleMatch || condition.$cb;
+    return condition.$elemMatch || condition.$eleMatch || condition.$cb;
   }
 
   _evaluateSpecialOperator(row, field, condition, getter) {
+    if (condition.$elemMatch) {
+      return this.$elemMatch(row, condition.$elemMatch, field, getter);
+    }
     if (condition.$eleMatch) {
       return this.$eleMatch(row, condition.$eleMatch, field, getter);
     }
@@ -175,12 +193,12 @@ class Comparators {
     return this[operator](value, operand, field, getter);
   }
 
-  static isSupportedOperator(operator) {
-    return operator.startsWith('$') && Object.hasOwnProperty.call(this.prototype, operator);
+  isSupportedOperator(operator) {
+    return operator.startsWith('$') && (typeof this[operator] === 'function');
   }
 
   static get arrayComparators() {
-    return ['$in', '$nin', '$contains', '$containsAll', '$containsAny', '$size'];
+    return ['$in', '$nin', '$contains', '$containsAll', '$all', '$containsAny', '$size', '$elemMatch', '$eleMatch'];
   }
 }
 

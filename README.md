@@ -6,15 +6,15 @@ A powerful JavaScript library for performing MongoDB-style queries on arrays of 
 
 - MongoDB-compatible query syntax with additional enhancements
 - Complex nested object and array querying
-- Rich set of comparison operators
-- Support for logical operators ($and, $or, $not)
-- Array operations (contains, size, element matching)
-- Regular expression support
-- Date comparison operations
-- Custom callback queries
-- Deep object traversal with dot notation
-- Robust error handling
-- Ideal for offline MongoDB collection filtering
+- Rich set of comparison operators ($eq, $gt, $gte, $lt, $lte, $in, $regex, etc.)
+- Support for logical operators ($and, $or, $not, $nor)
+- Array operations ($contains, $containsAll, $size, $eleMatch)
+- **NEW**: Support for complex `$size` operators (e.g., `{ $size: { $gte: 1 } }`)
+- **NEW**: MongoDB-compliant path resolution that traverses through arrays of objects
+- Regular expression and Date comparison support
+- Custom callback queries ($cb) for ultimate flexibility
+- Deep object traversal with robust dot notation
+- Ideal for offline MongoDB collection filtering and client-side state management
 
 ## Installation
 
@@ -132,6 +132,32 @@ query.query(data, {
     }
   }
 });
+```
+
+### Complex Array Size
+```javascript
+// Match arrays with a specific size or range
+query.query(data, { tags: { $size: 2 } });
+query.query(data, { tags: { $size: { $gte: 1 } } });
+```
+
+### Enhanced Path Resolution
+```javascript
+// Dot-notation now correctly traverses arrays of objects (MongoDB-compliant)
+const data = [
+  { 
+    items: [
+      { id: 1, status: 'active' },
+      { id: 2, status: 'pending' }
+    ] 
+  }
+];
+
+// Matches if any item in the array has status 'pending'
+query.query(data, { 'items.status': 'pending' });
+
+// Can combine with $size for complex filtering
+query.query(data, { 'items.status': { $size: { $gt: 1 } } });
 ```
 
 ### Custom Callback
